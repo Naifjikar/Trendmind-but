@@ -1,70 +1,60 @@
-import logging
-import os
-from datetime import datetime, timedelta
+import requests
 from telegram import Bot
-from telegram.ext import ApplicationBuilder, ContextTypes
-import asyncio
+from datetime import datetime
+import time
 
-# بيانات القنوات والتوكن
-BOT_TOKEN = os.environ.get("BOT_TOKEN")
-PUBLIC_CHANNEL_ID = os.environ.get("PUBLIC_CHANNEL_ID")
-PRIVATE_CHANNEL_ID = os.environ.get("PRIVATE_CHANNEL_ID")
+TOKEN = "8085180830:AAFJqSio_7BJ3n_1jbeHvYEZU5FmDJkT_Dw"
+PUBLIC_CHANNEL = "-782820280285"
+PRIVATE_CHANNEL = "@TrendMind0"
+bot = Bot(token=TOKEN)
 
-# إعدادات السجل
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO
-)
+def get_webull_top_gainers():
+    try:
+        url = "https://quotes-gw.webullfintech.com/api/securities/market/v5/gainers?region=us&userRegion=US"
+        response = requests.get(url)
+        data = response.json()
+        gainers = data.get("data", {}).get("list", [])
+        results = []
+        for stock in gainers:
+            symbol = stock.get("ticker")
+            name = stock.get("name")
+            price = float(stock.get("close"))
+            change = float(stock.get("changeRatio", 0))
+            if price < 5.00 and change > 5:
+                entry = round(price, 2)
+                target1 = round(entry + (entry * 0.08), 2)
+                target2 = round(entry + (entry * 0.15), 2)
+                target3 = round(entry + (entry * 0.25), 2)
+                target4 = round(entry + (entry * 0.40), 2)
+                stop = round(entry - (entry * 0.09), 2)
+                results.append(f"{symbol}\nدخول {entry}\nأهداف: {target1} - {target2} - {target3} - {target4}\nوقف: {stop}")
+        return results[:4]
+    except:
+        return []
 
-# توصيات اليوم (مثال ثابت – بتربط لاحقًا بفلاتر)
-recommendations = [
-    {"ticker": "XYZ", "entry": 2.35},
-    {"ticker": "ABC", "entry": 1.70},
-    {"ticker": "DEF", "entry": 4.20}
-]
+def send_recommendations():
+    gainers = get_webull_top_gainers()
+    if gainers:
+        for rec in gainers:
+            bot.send_message(chat_id=PRIVATE_CHANNEL, text=rec)
+    else:
+        bot.send_message(chat_id=PRIVATE_CHANNEL, text="لا توجد فرص مناسبة حالياً.")
 
-# حساب الأهداف والوقف بناءً على نقطة الدخول
-def get_targets(entry):
-    return {
-        "t1": round(entry * 1.08, 2),
-        "t2": round(entry * 1.15, 2),
-        "t3": round(entry * 1.25, 2),
-        "t4": round(entry * 1.40, 2),
-        "sl": round(entry * 0.91, 2)
-    }
-
-# إرسال التوصيات
-async def send_recommendations(bot):
-    for rec in recommendations:
-        prices = get_targets(rec["entry"])
-        msg = (
-            f"{rec['ticker']}\n"
-            f"دخول {rec['entry']}\n"
-            f"الأهداف: {prices['t1']} - {prices['t2']} - {prices['t3']} - {prices['t4']}\n"
-            f"وقف الخسارة: {prices['sl']}"
-        )
-        await bot.send_message(chat_id=PRIVATE_CHANNEL_ID, text=msg)
-        await asyncio.sleep(1)
-
-# إرسال ملخص النتايج في آخر اليوم
-async def send_results(bot):
+def send_results():
+    now = datetime.now().strftime("%Y-%m-%d")
+    # هذه النتائج مؤقتة كمثال، يجب تعديلها حسب بيانات المتابعة الحقيقية
     results = [
-        "XYZ دخول 2.35 حقق 3.00 - النسبة 40% 💰",
-        "ABC دخول 1.70 لم تحقق دخول",
-        "DEF دخول 4.20 ضربت الوقف ❌ - النسبة -9%"
+        "XYZ - 1\nدخول 1.00 حقق 2.00\nنسبة الربح 100% 💰",
+        "ABC - 2\nلم تحقق دخول",
+        "DEF - 3\nضربت الوقف ❌ - النسبة -9%"
     ]
-    final = "\n".join(results)
-    await bot.send_message(chat_id=PUBLIC_CHANNEL_ID, text=f"نتائج اليوم:\n{final}")
-    await bot.send_message(chat_id=PRIVATE_CHANNEL_ID, text=f"نتائج اليوم:\n{final}")
+    for line in results:
+        bot.send_message(chat_id=PUBLIC_CHANNEL, text=line)
 
-# المشغل
-async def main():
-    bot = Bot(token=BOT_TOKEN)
-    now = datetime.now().strftime("%H:%M")
-    if now.startswith("11:0"):  # البري ماركت الساعة 11 صباحًا
-        await send_recommendations(bot)
-    elif now.startswith("22:5"):  # نهاية اليوم
-        await send_results(bot)
-
-if __name__ == "__main__":
-    asyncio.run(main())
+while True:
+    current_time = datetime.now().strftime("%H:%M")
+    if current_time == "11:00":  # وقت إرسال توصيات البري ماركت
+        send_recommendations()
+    elif current_time == "23:00":  # وقت النتائج اليومية
+        send_results()
+    time.sleep(60)
