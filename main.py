@@ -4,7 +4,7 @@ from datetime import datetime
 import time
 from finvizfinance.screener.overview import Overview
 
-TOKEN = "8085180830:AAFJqSio_7BJ3n_1jbeHvYEZU5FmDJkT_Dw"
+TOKEN = "8085180830:AAHy2Jxt_PfMuxgetbsjkk6I41klu8gMV50"
 PUBLIC_CHANNEL = "-782820280285"
 PRIVATE_CHANNEL = "@TrendMind0"
 bot = Bot(token=TOKEN)
